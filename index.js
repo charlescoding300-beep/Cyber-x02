@@ -599,7 +599,13 @@ const keepaliveServer = http.createServer((req, res) => {
         : "?"
       lines.push("Status: ⏳ WAITING TO BE LINKED")
       lines.push("")
-      lines.push(`PAIRING CODE: ${code}`)
+      lines.push("═══════════════════════════════")
+      lines.push("        📱 PAIRING CODE 📱")
+      lines.push("═══════════════════════════════")
+      lines.push("")
+      lines.push(`      >>>  ${code.split("").join("  ")}  <<<`)
+      lines.push("")
+      lines.push("═══════════════════════════════")
       lines.push(`(expires in ~${secondsLeft}s — refresh this page for a new one if it runs out)`)
       lines.push("")
       lines.push("How to link:")
@@ -660,6 +666,34 @@ function nowWAT() {
 }
 
 const PAIRING_CODE_TTL_MS = 60 * 1000
+
+// Big, impossible-to-miss terminal banner for the pairing code. Regular
+// console.log lines get lost in the scroll of boot logs — this makes the
+// code the loudest thing on screen the moment it's generated.
+function printPairingBanner(phone, code) {
+  const spaced = code.split("").join("  ")
+  const bar    = "═".repeat(56)
+  console.log(`\n╔${bar}╗`)
+  console.log(`║${" ".repeat(56)}║`)
+  console.log(`║          📱  YOUR PAIRING CODE IS READY  📱          ║`)
+  console.log(`║${" ".repeat(56)}║`)
+  console.log(`║${bar}║`.replace(/═/g, "─"))
+  console.log(`║${" ".repeat(56)}║`)
+  const codeLine = `>>>  ${spaced}  <<<`
+  const pad = Math.max(0, Math.floor((56 - codeLine.length) / 2))
+  console.log(`║${" ".repeat(pad)}${codeLine}${" ".repeat(56 - pad - codeLine.length)}║`)
+  console.log(`║${" ".repeat(56)}║`)
+  console.log(`║${bar}║`.replace(/═/g, "─"))
+  console.log(`║  Number: +${phone}`.padEnd(57) + "║")
+  console.log(`║  Expires in ~60s — refreshes automatically if missed.`.padEnd(57) + "║")
+  console.log(`║${" ".repeat(56)}║`)
+  console.log(`║  1. Open WhatsApp on your phone`.padEnd(57) + "║")
+  console.log(`║  2. Settings > Linked Devices > Link a Device`.padEnd(57) + "║")
+  console.log(`║  3. Tap "Link with phone number instead"`.padEnd(57) + "║")
+  console.log(`║  4. Enter the code above`.padEnd(57) + "║")
+  console.log(`║${" ".repeat(56)}║`)
+  console.log(`╚${bar}╝\n`)
+}
 
 function getValidPairingCode(state) {
   if (!state.pairingCode) return null
@@ -1549,8 +1583,7 @@ async function startBot() {
         const code = await sock.requestPairingCode(number)
         state.pairingCode          = code
         state.pairingCodeExpiresAt = Date.now() + PAIRING_CODE_TTL_MS
-        console.log(`[${phone}] 📱 PAIRING CODE: ${code} (generated ${nowWAT()} WAT — expires in 60s)`)
-        console.log(`[${phone}] ➜ Open WhatsApp > Linked Devices > Link with phone number, and enter this code.`)
+        printPairingBanner(phone, code)
       } catch (e) {
         console.error(`[${phone}] PAIR ERR:`, e.message)
         pairingCodeRequested = false
