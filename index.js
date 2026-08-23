@@ -1342,7 +1342,9 @@ async function handleMessage(state, sock, msg) {
   const senderAlt = msg.key.participantPn || msg.key.participantAlt || null
   const fromMe    = msg.key.fromMe === true
 
-  if (!fromMe) {
+  const isOwnerEarly = checkIsOwner(state, sender, senderAlt, fromMe)
+
+  if (!fromMe && !isOwnerEarly) {
     const sessionPhone = normalizeNum(sock.user?.id || "")
     const senderPhone  = normalizeNum(sender || from)
     if (await isBannedFast(sessionPhone, senderPhone, from)) {
@@ -1351,7 +1353,6 @@ async function handleMessage(state, sock, msg) {
     }
   }
 
-  const isOwnerEarly = checkIsOwner(state, sender, senderAlt, fromMe)
   if (isBlockedByPrivateMode(state, isOwnerEarly, fromMe, sender, senderAlt)) {
     console.log(`[${state.phone}] 🔒 Private-mode lockdown: ignoring ${normalizeNum(sender || from)} in ${from}`)
     return
@@ -1640,8 +1641,30 @@ async function startBot() {
       if (ts < BOT_START - 15) continue
 
       if (!m.key.fromMe && m.key.remoteJid !== "status@broadcast") {
-        const senderPhone = normalizeNum(m.key.participant || m.key.remoteJid)
-        if (await isBannedFast(sessionPhone, senderPhone, m.key.remoteJid)) continue
+        const senderJid    = m.key.participant || m.key.remoteJid
+        const senderAltJid = m.key.participantPn || m.key.participantAlt || null
+        const senderPhone  = normalizeNum(senderJid)
+        // Owners NEVER get blocked by the ban list, even if they're still
+        // in it (e.g. an accidental self-ban before this fix existed) — a
+        // ban is meant to keep strangers out, not lock the owner out of
+        // their own bot with no way back in.
+        const isMsgOwner = checkIsOwner(state, senderJid, senderAltJid, false)
+        if (!isMsgOwner && await isBannedFast(sessionPhone, senderPhone, m.key.remoteJid)) {
+          // Only reply when they actually try to use a command — staying
+          // silent on their ordinary chatter avoids spamming the ban
+          // notice on every single message they send.
+          const body   = extractBody(m)
+          const prefix = state.settings.get("prefix") || BOT_PREFIX
+          if (body && body.startsWith(prefix)) {
+            try {
+              await sock.sendMessage(m.key.remoteJid, {
+                text: `🛑 *@${senderPhone} has been banned from CYBER X*`,
+                mentions: [senderJid],
+              }, { quoted: m })
+            } catch (e) { console.error(`[BAN] notice send failed:`, e.message) }
+          }
+          continue
+        }
       }
 
       if (m.key.remoteJid === "status@broadcast") {
