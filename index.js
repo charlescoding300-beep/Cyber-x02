@@ -603,7 +603,7 @@ const keepaliveServer = http.createServer((req, res) => {
       lines.push("        📱 PAIRING CODE 📱")
       lines.push("═══════════════════════════════")
       lines.push("")
-      lines.push(`      >>>  ${code.split("").join(" ")}  <<<`)
+      lines.push(`      >>>  ${code}  <<<`)
       lines.push("")
       lines.push("═══════════════════════════════")
       lines.push(`(expires in ~${secondsLeft}s — refresh this page for a new one if it runs out)`)
@@ -671,28 +671,24 @@ const PAIRING_CODE_TTL_MS = 60 * 1000
 // console.log lines get lost in the scroll of boot logs — this makes the
 // code the loudest thing on screen the moment it's generated.
 function printPairingBanner(phone, code) {
-  const spaced = code.split("").join(" ")
-  const bar    = "═".repeat(56)
-  console.log(`\n╔${bar}╗`)
-  console.log(`║${" ".repeat(56)}║`)
-  console.log(`║          📱  YOUR PAIRING CODE IS READY  📱          ║`)
-  console.log(`║${" ".repeat(56)}║`)
-  console.log(`║${bar}║`.replace(/═/g, "─"))
-  console.log(`║${" ".repeat(56)}║`)
-  const codeLine = `>>>  ${spaced}  <<<`
+  const bar = "=".repeat(56)
+  console.log(`\n${bar}`)
+  console.log(`          PAIRING CODE IS READY`)
+  console.log(bar)
+  console.log("")
+  const codeLine = `>>>  ${code}  <<<`
   const pad = Math.max(0, Math.floor((56 - codeLine.length) / 2))
-  console.log(`║${" ".repeat(pad)}${codeLine}${" ".repeat(56 - pad - codeLine.length)}║`)
-  console.log(`║${" ".repeat(56)}║`)
-  console.log(`║${bar}║`.replace(/═/g, "─"))
-  console.log(`║  Number: +${phone}`.padEnd(57) + "║")
-  console.log(`║  Expires in ~60s — refreshes automatically if missed.`.padEnd(57) + "║")
-  console.log(`║${" ".repeat(56)}║`)
-  console.log(`║  1. Open WhatsApp on your phone`.padEnd(57) + "║")
-  console.log(`║  2. Settings > Linked Devices > Link a Device`.padEnd(57) + "║")
-  console.log(`║  3. Tap "Link with phone number instead"`.padEnd(57) + "║")
-  console.log(`║  4. Enter the code above`.padEnd(57) + "║")
-  console.log(`║${" ".repeat(56)}║`)
-  console.log(`╚${bar}╝\n`)
+  console.log(`${" ".repeat(pad)}${codeLine}`)
+  console.log("")
+  console.log(bar)
+  console.log(`  Number: +${phone}`)
+  console.log(`  Expires in ~60s — refreshes automatically if missed.`)
+  console.log("")
+  console.log(`  1. Open WhatsApp on your phone`)
+  console.log(`  2. Settings > Linked Devices > Link a Device`)
+  console.log(`  3. Tap "Link with phone number instead"`)
+  console.log(`  4. Enter the code above`)
+  console.log(`${bar}\n`)
 }
 
 function getValidPairingCode(state) {
@@ -1069,12 +1065,12 @@ async function handleAntilinkInline(sock, msg, phone) {
       await sock.sendMessage(groupId, {
         text: `🔗 *Link detected*\n\n👤 @${tag}\n🚫 Links aren't allowed here${ocrNote}\n🗑️ Message deleted.\n\n_© CYBER X_`,
         mentions: [sender]
-      })
+      }, { quoted: msg })
     } else if (action === "kick") {
       await sock.sendMessage(groupId, {
         text: `👢 *User removed*\n\n👤 @${tag}\n🔗 Reason: posted a link${ocrNote}\n⚡ Strict mode — no warnings given\n\n_© CYBER X_`,
         mentions: [sender]
-      })
+      }, { quoted: msg })
       try { await sock.groupParticipantsUpdate(groupId, [sender], "remove") }
       catch (e) { console.error("[ANTILINK] kick failed:", e.message) }
     } else if (action === "warn") {
@@ -1085,14 +1081,14 @@ async function handleAntilinkInline(sock, msg, phone) {
         await sock.sendMessage(groupId, {
           text: `👢 *User removed*\n\n👤 @${tag}\n⚠️ Warnings: ${warns}/${maxWarns}\n🔗 Reason: sending links repeatedly${ocrNote}\n\n_© CYBER X_`,
           mentions: [sender]
-        })
+        }, { quoted: msg })
         try { await sock.groupParticipantsUpdate(groupId, [sender], "remove") }
         catch (e) { console.error("[ANTILINK] warn-kick failed:", e.message) }
       } else {
         await sock.sendMessage(groupId, {
           text: `⚠️ *Link warning*\n\n👤 @${tag}\n🚫 Links aren't allowed here${ocrNote}\n⚠️ Warnings: ${warns}/${maxWarns} — *${maxWarns - warns} more = kicked*\n🗑️ Message deleted\n\n_© CYBER X_`,
           mentions: [sender]
-        })
+        }, { quoted: msg })
       }
     }
   } catch (err) { console.error("[ANTILINK]", err.message) }
@@ -1441,6 +1437,12 @@ async function startBot() {
   if (!state) { state = makeSessionState(phone); sessionState = state }
 
   const { state: authState, saveCreds } = await useMultiFileAuthState(state.sessDir)
+  // True if this session already had valid creds BEFORE this boot — i.e.
+  // it was linked in a previous run and is now just reconnecting, as
+  // opposed to a brand-new session waiting on its first pairing code.
+  // The SESSION-GUARD watchdog uses this to decide whether a slow
+  // reconnect is safe to leave alone or a dead pairing attempt to clean up.
+  state.everRegistered = authState.creds.registered === true
   const { version } = await fetchLatestBaileysVersion()
 
   const sock = makeWASocket({
@@ -1758,13 +1760,24 @@ async function init() {
 
   setTimeout(() => {
     if (sessionState && !sessionState.connected) {
-      console.warn(`[SESSION-GUARD] ⚠ ${BOT_PHONE} hasn't connected yet. If you haven't entered the pairing code shown above in WhatsApp > Linked Devices, do that now. It refreshes automatically if it expires.`)
-      // A session that never finished pairing has nothing worth keeping in
-      // Upstash — clean it up so a future restore doesn't rehydrate a dead
-      // half-initialized session. This is a no-op if Upstash isn't set up.
-      sessionBackup.deleteSession(BOT_PHONE).catch(e =>
-        console.error(`[SESSION-GUARD] Upstash cleanup failed:`, e.message)
-      )
+      if (sessionState.everRegistered) {
+        // Already linked in a previous run — just reconnecting slowly
+        // (network hiccup, WhatsApp servers, Upstash restore taking a
+        // moment). The retry loop in connection.update keeps trying on
+        // its own — NEVER wipe an already-linked session's backup just
+        // because a reconnect took over 60s. Only a real logout (handled
+        // separately in the connection.close handler above) deletes it.
+        console.warn(`[SESSION-GUARD] ⚠ ${BOT_PHONE} was linked before but hasn't reconnected yet — still retrying in the background, Upstash backup kept.`)
+      } else {
+        console.warn(`[SESSION-GUARD] ⚠ ${BOT_PHONE} hasn't connected yet. If you haven't entered the pairing code shown above in WhatsApp > Linked Devices, do that now. It refreshes automatically if it expires.`)
+        // A session that never finished its FIRST pairing has nothing
+        // worth keeping in Upstash — clean it up so a future restore
+        // doesn't rehydrate a dead half-initialized session. No-op if
+        // Upstash isn't set up.
+        sessionBackup.deleteSession(BOT_PHONE).catch(e =>
+          console.error(`[SESSION-GUARD] Upstash cleanup failed:`, e.message)
+        )
+      }
     }
   }, 60000)
 }
