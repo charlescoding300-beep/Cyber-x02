@@ -556,8 +556,8 @@ const helper = {
   fetchBuffer: fetchBufferSafe,
   downloadMediaSafe: (msg, sock, retries) => downloadMediaSafe(msg, sock, retries),
   box(title, lines = []) {
-    const body = lines.map(l => `║  ${l}`).join("\n")
-    return `╔══════════════════════════╗\n║  ${title}\n╠══════════════════════════╣\n${body}\n╚══════════════════════════╝\n\n© 𝕮𝖄𝕭𝖤𝕽 𝖃 ™`
+    const body = lines.map(l => `▸ ${l}`).join("\n")
+    return `*${title}*\n${body}\n\n_© CYBER X_`
   },
   msToTime(ms) { const s = Math.floor(ms/1000); return `${Math.floor(s/3600)}h ${Math.floor((s%3600)/60)}m ${s%60}s` },
   sleep(ms)    { return new Promise(r => setTimeout(r, ms)) },
@@ -603,7 +603,7 @@ const keepaliveServer = http.createServer((req, res) => {
       lines.push("        📱 PAIRING CODE 📱")
       lines.push("═══════════════════════════════")
       lines.push("")
-      lines.push(`      >>>  ${code.split("").join("  ")}  <<<`)
+      lines.push(`      >>>  ${code.split("").join(" ")}  <<<`)
       lines.push("")
       lines.push("═══════════════════════════════")
       lines.push(`(expires in ~${secondsLeft}s — refresh this page for a new one if it runs out)`)
@@ -671,7 +671,7 @@ const PAIRING_CODE_TTL_MS = 60 * 1000
 // console.log lines get lost in the scroll of boot logs — this makes the
 // code the loudest thing on screen the moment it's generated.
 function printPairingBanner(phone, code) {
-  const spaced = code.split("").join("  ")
+  const spaced = code.split("").join(" ")
   const bar    = "═".repeat(56)
   console.log(`\n╔${bar}╗`)
   console.log(`║${" ".repeat(56)}║`)
@@ -1067,12 +1067,12 @@ async function handleAntilinkInline(sock, msg, phone) {
 
     if (action === "delete") {
       await sock.sendMessage(groupId, {
-        text: `╔════════════════════╗\n║  🔗 *LINK DETECTED!*  ║\n╚════════════════════╝\n\n┌─────〔 🚫 *BLOCKED* 〕─────\n│ 👤 *User:* @${tag}\n│ ❌ Links are *NOT* allowed here!${ocrNote}\n│ 🗑️ Message has been deleted.\n└──────────────────────────\n> © *𝕮𝖄𝕭𝙴𝚁 𝖃 ™*`,
+        text: `🔗 *Link detected*\n\n👤 @${tag}\n🚫 Links aren't allowed here${ocrNote}\n🗑️ Message deleted.\n\n_© CYBER X_`,
         mentions: [sender]
       })
     } else if (action === "kick") {
       await sock.sendMessage(groupId, {
-        text: `╔════════════════════╗\n║  👢 *USER KICKED!*  ║\n╚════════════════════╝\n\n┌─────〔 🚫 *INSTANT KICK* 〕─────\n│ 👤 *User:* @${tag}\n│ 🔗 *Reason:* Posted a link${ocrNote}\n│ ⚡ *Mode:* Strict — no warnings given\n│ 👢 *Status:* Removed from group\n└──────────────────────────\n> © *𝕮𝖄𝕭𝙴𝚁 𝖃 ™*`,
+        text: `👢 *User removed*\n\n👤 @${tag}\n🔗 Reason: posted a link${ocrNote}\n⚡ Strict mode — no warnings given\n\n_© CYBER X_`,
         mentions: [sender]
       })
       try { await sock.groupParticipantsUpdate(groupId, [sender], "remove") }
@@ -1083,14 +1083,14 @@ async function handleAntilinkInline(sock, msg, phone) {
       if (warns >= maxWarns) {
         antilinkResetWarnings(phone, groupId, sender)
         await sock.sendMessage(groupId, {
-          text: `╔════════════════════╗\n║  👢 *USER KICKED!*  ║\n╚════════════════════╝\n\n┌─────〔 🚫 *ACTION TAKEN* 〕─────\n│ 👤 *User:* @${tag}\n│ ⚠️ *Warnings:* ${warns}/${maxWarns}\n│ 🔗 *Reason:* Sending links repeatedly${ocrNote}\n│ 👢 *Status:* Removed from group\n└──────────────────────────\n> © *𝕮𝖄𝕭𝙴𝚁 𝖃 ™*`,
+          text: `👢 *User removed*\n\n👤 @${tag}\n⚠️ Warnings: ${warns}/${maxWarns}\n🔗 Reason: sending links repeatedly${ocrNote}\n\n_© CYBER X_`,
           mentions: [sender]
         })
         try { await sock.groupParticipantsUpdate(groupId, [sender], "remove") }
         catch (e) { console.error("[ANTILINK] warn-kick failed:", e.message) }
       } else {
         await sock.sendMessage(groupId, {
-          text: `╔════════════════════╗\n║  ⚠️ *LINK WARNING!*  ║\n╚════════════════════╝\n\n┌─────〔 🚫 *WARNING* 〕─────\n│ 👤 *User:* @${tag}\n│ 🔗 Links are *NOT* allowed here!${ocrNote}\n│ ⚠️ *Warnings:* ${warns}/${maxWarns}\n│ 🗑️ Message deleted\n│ ⚡ *${maxWarns - warns} more = KICK!*\n└──────────────────────────\n> © *𝕮𝖄𝕭𝙴𝚁 𝖃 ™*`,
+          text: `⚠️ *Link warning*\n\n👤 @${tag}\n🚫 Links aren't allowed here${ocrNote}\n⚠️ Warnings: ${warns}/${maxWarns} — *${maxWarns - warns} more = kicked*\n🗑️ Message deleted\n\n_© CYBER X_`,
           mentions: [sender]
         })
       }
@@ -1267,7 +1267,7 @@ async function handleAntistatusInline(sock, msg, phone) {
         try {
           await sock.groupParticipantsUpdate(groupId, [sender], "remove")
           await sock.sendMessage(groupId, {
-            text: `╔════════════════════╗\n║  👢 *USER KICKED!*  ║\n╚════════════════════╝\n\n┌─────〔 🚫 *ANTISTATUS* 〕─────\n│ 👤 *User:* @${tag}\n│ 📱 *Reason:* Tagged this group in their status\n│ ⚡ *Mode:* Instant kick\n└──────────────────────────\n> © *𝕮𝖄𝕭𝙴𝚁 𝖃 ™*`,
+            text: `👢 *User removed*\n\n👤 @${tag}\n📱 Reason: tagged this group in their status\n⚡ Instant kick mode\n\n_© CYBER X_`,
             mentions: [sender]
           })
         } catch (e) { console.error("[ANTISTATUS] kick failed:", e.message) }
@@ -1279,19 +1279,19 @@ async function handleAntistatusInline(sock, msg, phone) {
           try {
             await sock.groupParticipantsUpdate(groupId, [sender], "remove")
             await sock.sendMessage(groupId, {
-              text: `╔════════════════════╗\n║  👢 *USER KICKED!*  ║\n╚════════════════════╝\n\n┌─────〔 🚫 *ANTISTATUS* 〕─────\n│ 👤 *User:* @${tag}\n│ ⚠️ *Warnings:* ${warns}/${maxWarns}\n│ 📱 *Reason:* Repeatedly tagged this group in status\n└──────────────────────────\n> © *𝕮𝖄𝕭𝙴𝚁 𝖃 ™*`,
+              text: `👢 *User removed*\n\n👤 @${tag}\n⚠️ Warnings: ${warns}/${maxWarns}\n📱 Reason: repeatedly tagged this group in status\n\n_© CYBER X_`,
               mentions: [sender]
             })
           } catch (e) { console.error("[ANTISTATUS] warn-kick failed:", e.message) }
         } else {
           await sock.sendMessage(groupId, {
-            text: `╔════════════════════╗\n║  ⚠️ *STATUS WARNING* ║\n╚════════════════════╝\n\n┌─────〔 📱 *ANTISTATUS* 〕─────\n│ 👤 *User:* @${tag}\n│ 🚫 Don't tag this group in your status!\n│ ⚠️ *Warnings:* ${warns}/${maxWarns}\n│ ⚡ *${maxWarns - warns} more = KICK!*\n└──────────────────────────\n> © *𝕮𝖄𝕭𝙴𝚁 𝖃 ™*`,
+            text: `⚠️ *Status warning*\n\n👤 @${tag}\n📱 Don't tag this group in your status\n⚠️ Warnings: ${warns}/${maxWarns} — *${maxWarns - warns} more = kicked*\n\n_© CYBER X_`,
             mentions: [sender]
           }).catch(() => {})
         }
       } else {
         await sock.sendMessage(groupId, {
-          text: `╔════════════════════╗\n║  📱 *STATUS ACTION* ║\n╚════════════════════╝\n\n┌─────〔 🚫 *ANTISTATUS* 〕─────\n│ 👤 *User:* @${tag}\n│ 🚫 Tagged this group in their status — action taken\n└──────────────────────────\n> © *𝕮𝖄𝕭𝙴𝚁 𝖃 ™*`,
+          text: `📱 *Status action*\n\n👤 @${tag}\n🚫 Tagged this group in their status — action taken\n\n_© CYBER X_`,
           mentions: [sender]
         }).catch(() => {})
       }
@@ -1507,11 +1507,10 @@ async function startBot() {
           if (enabled) {
             const actorPhone = author ? author.replace("@s.whatsapp.net", "").replace(/:\d+$/, "") : null
             const actorJid   = author || null
-            const boxTitle = action === "promote" ? "⬆️ ADMIN PROMOTION" : "⬇️ ADMIN DEMOTED"
-            const verb     = action === "promote" ? "promoted to" : "demoted from"
+            const title = action === "promote" ? "⬆️ *Admin promotion*" : "⬇️ *Admin demoted*"
+            const verb  = action === "promote" ? "promoted to" : "demoted from"
             const text =
-              `╔═══════════════════════════╗\n║   ${boxTitle}${" ".repeat(Math.max(0, 21 - boxTitle.length))}║\n╚═══════════════════════════╝\n\n` +
-              `👤 @${memberPhone} has been ${verb} *Admin*\n🛡️ ${action === "promote" ? "Promoted" : "Demoted"} by: ${actorJid ? "@" + actorPhone : "Unknown"}\n📊 Total Admins: ${adminCount}\n\n> © 𝕮𝖄𝕭𝙴𝚁 𝖃 ™`
+              `${title}\n\n👤 @${memberPhone} was ${verb} *Admin*\n🛡️ By: ${actorJid ? "@" + actorPhone : "Unknown"}\n📊 Total admins: ${adminCount}\n\n_© CYBER X_`
             const mentions = [participantJid, ...(actorJid ? [actorJid] : [])]
             await sock.sendMessage(groupId, { text, mentions })
             console.log(`[WATCHDOG:${phone}] ✅ Sent ${action.toUpperCase()} announcement to "${groupName}" for ${memberPhone}`)
@@ -1760,6 +1759,12 @@ async function init() {
   setTimeout(() => {
     if (sessionState && !sessionState.connected) {
       console.warn(`[SESSION-GUARD] ⚠ ${BOT_PHONE} hasn't connected yet. If you haven't entered the pairing code shown above in WhatsApp > Linked Devices, do that now. It refreshes automatically if it expires.`)
+      // A session that never finished pairing has nothing worth keeping in
+      // Upstash — clean it up so a future restore doesn't rehydrate a dead
+      // half-initialized session. This is a no-op if Upstash isn't set up.
+      sessionBackup.deleteSession(BOT_PHONE).catch(e =>
+        console.error(`[SESSION-GUARD] Upstash cleanup failed:`, e.message)
+      )
     }
   }, 60000)
 }

@@ -74,7 +74,7 @@ module.exports = {
   unbanUser,
   listBanned,
 
-  async run({ sock, msg, args, isOwner, isAdmin, helper, banCacheInvalidate }) {
+  async run({ sock, msg, args, sender, isOwner, isAdmin, helper, banCacheInvalidate, checkIsOwner }) {
     if (!isOwner && !isAdmin) return helper.reply(sock, msg, "❌ Only admins/owner can ban.")
 
     const target = extractTarget({ msg, args })
@@ -82,13 +82,25 @@ module.exports = {
 
     const targetPhone  = normalizeNum(target)
     const sessionPhone = normalizeNum(sock.user?.id || "")
+    const senderPhone  = normalizeNum(sender || "")
+
+    if (targetPhone === sessionPhone) {
+      return helper.reply(sock, msg, "❌ Can't ban the bot itself.")
+    }
+    if (targetPhone === senderPhone) {
+      return helper.reply(sock, msg, "❌ You can't ban yourself.")
+    }
+    if (checkIsOwner?.(target, null)) {
+      return helper.reply(sock, msg, "❌ Can't ban the owner.")
+    }
+
     const isNumberArg  = args[0] && /^\+?\d[\d\s-]*$/.test(args[0])
     const reason        = (isNumberArg ? args.slice(1) : args.slice(0)).join(" ").trim()
 
     banUser(sessionPhone, targetPhone, reason)
     banCacheInvalidate?.(targetPhone)
 
-    return helper.reply(sock, msg, helper.box("🚫 USER BANNED", [
+    return helper.reply(sock, msg, helper.box("🚫 User banned", [
       `Number: +${targetPhone}`,
       reason ? `Reason: ${reason}` : "No reason given",
     ]))
