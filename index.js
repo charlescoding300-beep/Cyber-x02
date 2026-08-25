@@ -1610,6 +1610,40 @@ async function startBot() {
       }
       saveMeta()
       sessionBackup.pushImmediate(phone).catch(e => console.error(`[${phone}] BACKUP PUSH ERR:`, e.message))
+
+      // One-time "connection verified" confirmation, sent to the owner's
+      // own DM — only on the FIRST ever successful link (state.everRegistered
+      // was false going into this boot), never on a plain reconnect after
+      // a restart. Image URL is hardcoded here on purpose — swap it below
+      // directly if it ever needs to change.
+      if (!state.everRegistered) {
+        ;(async () => {
+          try {
+            const ownerJid = `${phone}@s.whatsapp.net`
+            const prefix = state.settings.get("prefix") || BOT_PREFIX
+            const caption =
+              `✅ *Connection Verified*\n\n` +
+              `Hello 👋\n\n` +
+              `Your connection to *CYBER X* has been successfully verified and activated.\n\n` +
+              `🟢 *Status:* Connected\n` +
+              `🔐 *Security:* Verified\n` +
+              `⚡ *System:* Active\n\n` +
+              `Your account is now ready to use.\n` +
+              `👉 Type *${prefix}menu* to continue and access all available features.\n\n` +
+              `Have a great day! ✨\n\n` +
+              `_© CYBER X_`
+            const imageUrl = "https://i.ibb.co/PG3BtSyx/33a1c93d650505a4195f12a7d4ed4cd7.jpg"
+            try {
+              await sock.sendMessage(ownerJid, { image: { url: imageUrl }, caption })
+            } catch (e) {
+              console.error(`[${phone}] connection-verified image failed, falling back to text:`, e.message)
+              await sock.sendMessage(ownerJid, { text: caption })
+            }
+          } catch (e) {
+            console.error(`[${phone}] connection-verified send failed:`, e.message)
+          }
+        })()
+      }
     }
 
     if (connection === "close") {
